@@ -9,6 +9,7 @@ import {
 	Stack,
 	ThemeIcon,
 	Center,
+	Space,
 } from "@mantine/core"
 import { ethers } from "ethers"
 import { useNotification } from "web3uikit"
@@ -27,6 +28,7 @@ export default function LotterEntrance() {
 	const [fakeAddress1, setFakeAddress1] = useState("0")
 	const [fakeAddress2, setFakeAddress2] = useState("0")
 	const [loadingEnter, setLoadingEnter] = useState(false)
+	const [prize, setPrize] = useState("0")
 	const dispatch = useNotification()
 
 	const { runContractFunction: enterRaffle } = useWeb3Contract({
@@ -58,20 +60,36 @@ export default function LotterEntrance() {
 		params: {},
 	})
 
+	const { runContractFunction: getBalance } = useWeb3Contract({
+		abi: abi,
+		contractAddress: raffleAddress,
+		functionName: "getBalance",
+		params: {},
+	})
+
 	async function updateUI() {
 		const entranceFeeFromCall = (await getEntranceFee()).toString()
-		const numPlayersFromCall = (await getNumberOfPlayers()).toString()
+		let numPlayersFromCall = 0
+		try {
+			const numPlayersFromCall = (await getNumberOfPlayers()).toString()
+			setNumPlayers(numPlayersFromCall)
+		} catch {
+			const numPlayersFromCall = 0
+			setNumPlayers(numPlayersFromCall)
+		}
 		const recentWinnerFromCall = await getRecentWinner()
+		const prizeFromCall = await getBalance()
+		const prize = prizeFromCall.sub(prizeFromCall.div(10)).toString()
 		setEntranceFee(entranceFeeFromCall)
-		setNumPlayers(numPlayersFromCall)
 		setRecentWinner(recentWinnerFromCall)
+		setPrize(prize)
 	}
 
 	useEffect(() => {
 		if (isWeb3Enabled) {
 			updateUI()
 		}
-	}, [isWeb3Enabled])
+	})
 
 	const handleSuccess = async function (tx) {
 		await tx.wait(1)
@@ -126,8 +144,15 @@ export default function LotterEntrance() {
 	}
 
 	return (
-		<div>
-			<Stack spacing="xl">
+		<div
+			style={{
+				display: "flex",
+				alignItems: "center",
+				justifyContent: "center",
+				height: "calc(100vh - 100px)",
+			}}
+		>
+			<Stack spacing="xl" style={{ width: "80vw" }}>
 				<Title order={1} ta="center">
 					Welcome to{" "}
 					<Text
@@ -137,6 +162,17 @@ export default function LotterEntrance() {
 						gradient={{ from: "indigo", to: "cyan", deg: 45 }}
 					>
 						ETH Raffle
+					</Text>
+				</Title>
+				<Title order={2} ta="center">
+					The current prize is{" "}
+					<Text
+						span
+						inherit
+						variant="gradient"
+						gradient={{ from: "indigo", to: "cyan", deg: 45 }}
+					>
+						{ethers.utils.formatUnits(prize, "ether")}ETH
 					</Text>
 				</Title>
 				{raffleAddress ? (
@@ -162,7 +198,10 @@ export default function LotterEntrance() {
 								setLoadingEnter(true)
 								await enterRaffle({
 									onSuccess: handleSuccess,
-									onError: (error) => console.log(error),
+									onError: (error) => {
+										console.log(error)
+										setLoadingEnter(false)
+									},
 								})
 							}}
 							loading={loadingEnter}
